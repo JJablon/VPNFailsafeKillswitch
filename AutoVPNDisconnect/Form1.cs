@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -112,9 +112,11 @@ namespace AutoVPNDisconnect
             bool flag = false;
             bool flag_found = false;
             var allProcceses = Process.GetProcesses();
+            var cos = textBox1.Text.Substring(textBox1.Text.LastIndexOf("\\") + 1, textBox1.Text.Length + 2 - textBox1.Text.LastIndexOf("."));
             foreach (Process p in allProcceses)
             {
-                if (p.ProcessName == textBox1.Text.Substring(textBox1.Text.LastIndexOf("\\") + 1, textBox1.Text.Length + 2 - textBox1.Text.LastIndexOf(".")))
+                //Clipboard.SetText(Clipboard.GetText() + p.ProcessName+"\n");
+                if (p.ProcessName.Contains(textBox1.Text.Substring(textBox1.Text.LastIndexOf("\\") + 1, textBox1.Text.Length + 2 - textBox1.Text.LastIndexOf("."))))
                     flag_found = true;
             }
 
