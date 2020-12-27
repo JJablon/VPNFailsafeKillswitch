@@ -14,19 +14,48 @@ using System.Net.Sockets;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
+//todo:
+//-the window cannot be brought up from the task bar
+//- the "Cancel" button will not close app
+//- verify if the app is always killed uppon exit (new feature)
+//- the VPN is not automatically connected when 
 
 namespace AutoVPNDisconnect
 {
     public partial class Form1 : Form
     {
         //IResourceWriter writer = new ResourceWriter("Resource1.resx");
-
+        
         public Form1()
         {
             InitializeComponent();
-            this.notifyIcon1.Icon = SystemIcons.Shield;
-            this.notifyIcon1.ShowBalloonTip(10000, "VPN Failsafe Killswitch", "VPN Failsafe Killswitch running in the background..", new ToolTipIcon());
-            toolStripStatusLabel1.Text = "Status: ";
+            
+            var contents = "";
+            DialogResult DR = MessageBox.Show("Should I reconnect to VPN when VPN disconnected?", "Auto VPN reconnect", MessageBoxButtons.YesNoCancel);
+            try
+            {
+                var c = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\VPN.txt";
+                if (File.Exists(c))
+                    contents = File.ReadAllText(c);
+                else contents = null;
+            }
+            catch (Exception e) { }
+            if (contents != null)
+            {
+                var login_data = contents.Split(' ');
+                this.textBox4.Text = login_data[0];
+                this.textBox5.Text = login_data[1];
+                this.maskedTextBox1.Text = login_data[2];
+            }
+
+            if (DR == DialogResult.Yes) this.checkBox3.Checked = true;
+            else if (DR == DialogResult.No) this.checkBox3.Checked = false;
+            else Application.Exit();
+
+            this.Icon = SystemIcons.Shield;
+            this.ShowIcon = true;
+            //this.notifyIcon1.Icon = SystemIcons.Shield;
+             toolStripStatusLabel1.Text = "Status: ";
             this.timer1.Interval = 1;
             this.Visible = false;
             this.FormClosing += Form1_FormClosing;
@@ -45,11 +74,15 @@ namespace AutoVPNDisconnect
             {
                 this.textBox2.Text = IP;
             }
+            
         }
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
-       
+            if (checkBox4.Checked)
+                AppTaskKill();
+            if (checkBox4.Checked)
+                System.Diagnostics.Process.Start("cmd.exe", "/c rasdial.exe /d");
         }
         
         private void button1_Click(object sender, EventArgs e)
@@ -82,13 +115,15 @@ namespace AutoVPNDisconnect
             return list;
             //throw new Exception("No network adapters with an IPv4 address in the system!");
         }
-
-        private void timer1_Tick(object sender, EventArgs e)
+        
+        void AppTaskKill()
         {
-            this.timer1.Interval = 2000;
-            this.listBox1.Items.Clear();
-            List<string> list = this.GetLocalIPAddress();
-            this.listBox1.Items.AddRange(list.ToArray());
+            System.Diagnostics.Process.Start("cmd.exe", "/c taskkill /F /IM " + textBox1.Text.Substring(textBox1.Text.LastIndexOf("\\") + 1));
+
+        }
+        bool firstLoop = true;
+    void VPNDisconnect()
+        {
 
             /*
             Process p = new Process();
@@ -108,7 +143,9 @@ namespace AutoVPNDisconnect
             p.WaitForExit();
             this.textBox3.Text = output;
 
-    */
+    */      List<string> list = this.GetLocalIPAddress();
+            this.listBox1.Items.AddRange(list.ToArray());
+
             bool flag = false;
             bool flag_found = false;
             var allProcceses = Process.GetProcesses();
@@ -127,12 +164,21 @@ namespace AutoVPNDisconnect
                     flag = true;
                 }
             }
-            if (flag == true) { toolStripStatusLabel1.Text = "Status: VPN CONNECTED"; notifyIcon1.Text = "Status: VPN CONNECTED"; }
-            else {toolStripStatusLabel1.Text = "Status: VPN DISCONNECTED"; notifyIcon1.Text = "Status: VPN DISCONNECTED"; }
+            if (flag == true) { toolStripStatusLabel1.Text = "Status: VPN CONNECTED"; notifyIcon1.Text = "Status: VPN CONNECTED";
+                                this.notifyIcon1.Icon = SystemIcons.Shield;
+                                }
+            else { toolStripStatusLabel1.Text = "Status: VPN DISCONNECTED"; notifyIcon1.Text = "Status: VPN DISCONNECTED";
+                                 this.notifyIcon1.Icon = SystemIcons.Error;
+            }
+            if(firstLoop) this.notifyIcon1.ShowBalloonTip(2000, "VPN Failsafe Killswitch v1.0", "VPN Failsafe Killswitch running in the background..", new ToolTipIcon());
+            firstLoop = false;
 
-            if (flag == false&&flag_found==true)
+            if (flag == false && flag_found == true)
             {
-                System.Diagnostics.Process.Start("cmd.exe", "/c taskkill /F /IM " + textBox1.Text.Substring(textBox1.Text.LastIndexOf("\\") + 1));
+                //System.Diagnostics.Process.Start("cmd.exe", "/c taskkill /F /IM " + textBox1.Text.Substring(textBox1.Text.LastIndexOf("\\") + 1));
+                //moved to:
+                AppTaskKill();
+
 
                 //Process myprc = GetaProcess(textBox1.Text.Substring(textBox1.Text.LastIndexOf("\\") + 1,textBox1.Text.Length+2- textBox1.Text.LastIndexOf(".")));
                 // try
@@ -143,12 +189,21 @@ namespace AutoVPNDisconnect
             }
             else
             {
-              
+
 
             }
             if (flag_last != null && flag_last == false && flag == true && checkBox2.Checked) System.Diagnostics.Process.Start(textBox1.Text);
             if (flag_last != null && flag_last == true && flag == false && checkBox3.Checked) Connect_VPN();
             flag_last = flag;
+
+
+        }
+        private void timer1_Tick(object sender, EventArgs e)
+        {
+            this.timer1.Interval = 2000;
+            this.listBox1.Items.Clear();
+            VPNDisconnect();
+
         }
         bool? flag_last = null;
         private Process GetaProcess(string processname)
@@ -174,10 +229,20 @@ namespace AutoVPNDisconnect
 
         private void notifyIcon1_MouseClick(object sender, MouseEventArgs e)
         {
-            if(e.Button == MouseButtons.Left)
+            if (e.Button == MouseButtons.Left)
+            {
                 
-            this.Visible = !this.Visible;
-            if (e.Button == MouseButtons.Right) {
+                this.Visible = !this.Visible;
+                //if (this.WindowState == FormWindowState.Minimized) this.WindowState = FormWindowState.Normal;
+                //this.Activate();
+                //this.BringToFront();
+                //this.TopMost = true;
+                //this.Focus();
+                //else if (this.WindowState == FormWindowState.Normal) this.WindowState = FormWindowState.Minimized;
+                //this.Show();
+            }
+
+                if (e.Button == MouseButtons.Right) {
                 var r = WinAPI.GetTrayRectangle();
                 contextMenuStrip1.Show(new Point(r.Right, r.Top));
                     }
@@ -195,7 +260,7 @@ namespace AutoVPNDisconnect
             }
             catch (Exception e)
             {
-                MessageBox.Show("Please create a file VPN.txt in %appdata% with contents like:VPNConnectionName VPNUsername VPNPassword");
+                MessageBox.Show("Please create a file VPN.txt in %appdata% with following contents :VPNConnectionName VPNUsername VPNPassword");
             }
         }
 
@@ -206,7 +271,25 @@ namespace AutoVPNDisconnect
 
         private void exitToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            if (checkBox4.Checked) VPNDisconnect();
             Application.Exit();
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                var c = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\VPN.txt";
+                var contents = this.textBox4.Text + " "+ this.textBox5.Text + " " + this.maskedTextBox1.Text;
+                File.WriteAllText(c, contents);
+
+            }
+            catch (Exception exc) { }
+        }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+            Connect_VPN();
         }
     }
 
